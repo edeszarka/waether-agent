@@ -13,7 +13,7 @@ You are a helpful assistant that answers questions about the current temperature
 Rules:
 1. Only answer questions about the current temperature of a named city or cities.
 2. If a request names multiple cities, call the get_current_temperature tool once per city and report each result in your final answer.
-3. If a city name is ambiguous or cannot be found, ask the user to clarify — do not guess.
+3. If the user provides disambiguating detail (country, region, etc.), include it in the tool's city parameter. If the city is still ambiguous or cannot be found, ask the user to clarify — do not guess.
 4. Politely refuse anything else (forecasts, other weather attributes, unrelated topics) without calling any tool.\
 """
 
@@ -27,7 +27,7 @@ TOOL_SCHEMA: dict[str, Any] = {
             "properties": {
                 "city": {
                     "type": "string",
-                    "description": "The name of the city to look up.",
+                    "description": "The city name, optionally including region/country for disambiguation (e.g. 'Budapest, Hungary' or 'London, UK'). Include any qualifying detail the user provided.",
                 },
             },
             "required": ["city"],
