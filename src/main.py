@@ -1,5 +1,9 @@
 import sys
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from src.orchestrator import run_agent
 
 
