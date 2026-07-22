@@ -103,8 +103,8 @@ class TestSuccessfulRetrieval:
             assert len(steps) == 4
             assert steps[0]["type"] == "think"
             assert steps[1]["type"] == "tool_call"
-            assert steps[1]["content"]["name"] == "get_current_temperature"
-            assert steps[1]["content"]["arguments"]["city"] == "Budapest"
+            assert steps[1]["name"] == "get_current_temperature"
+            assert steps[1]["arguments"]["city"] == "Budapest"
             assert steps[2]["type"] == "tool_result"
             assert steps[2]["content"] == _BUDAPEST_OK
             assert steps[3]["type"] == "think"
@@ -170,7 +170,7 @@ class TestAmbiguousCity:
             assert step_types == ["think", "tool_call", "tool_result", "think"]
 
             tool_call_step = steps[1]
-            assert tool_call_step["content"]["arguments"]["city"] == "Springfield"
+            assert tool_call_step["arguments"]["city"] == "Springfield"
 
             tool_result_step = steps[2]
             assert tool_result_step["content"]["error"] == "ambiguous_city"
@@ -216,7 +216,7 @@ class TestMultipleCities:
             ]
 
             arguments = [
-                s["content"]["arguments"]["city"]
+                s["arguments"]["city"]
                 for s in steps
                 if s["type"] == "tool_call"
             ]
