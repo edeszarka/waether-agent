@@ -170,6 +170,86 @@ class TestGetCurrentTemperature:
         assert result["error"] == "upstream_error"
 
 
+class TestCountryFilter:
+
+    def test_with_country_resolves(self):
+        geo_payload = {"results": [_make_geo_result("Budapest", 47.49, 19.04, "Budapest", "Hungary")]}
+        wx_payload = _make_forecast(26.5)
+
+        with patch("src.weather_tool.requests.get") as mock_get:
+            def side_effect(url, **kwargs):
+                class MockResponse:
+                    def __init__(self, data):
+                        self._data = data
+                    def raise_for_status(self):
+                        pass
+                    def json(self):
+                        return self._data
+                if FORECAST_URL in url:
+                    return MockResponse(wx_payload)
+                if GEOCODING_URL in url:
+                    return MockResponse(geo_payload)
+
+            mock_get.side_effect = side_effect
+            result = get_current_temperature("Budapest", country="Hungary")
+
+        assert result["city"] == "Budapest, Budapest, Hungary"
+        assert result["temperature"] == 26.5
+        assert result["unit"] == "celsius"
+
+        call_args = mock_get.call_args_list[0]
+        assert call_args[1]["params"].get("country_code") == "HU"
+
+    def test_alpha2_code_accepted(self):
+        geo_payload = {"results": [_make_geo_result("Budapest", 47.49, 19.04, "Budapest", "Hungary")]}
+        wx_payload = _make_forecast(26.5)
+
+        with patch("src.weather_tool.requests.get") as mock_get:
+            def side_effect(url, **kwargs):
+                class MockResponse:
+                    def __init__(self, data):
+                        self._data = data
+                    def raise_for_status(self):
+                        pass
+                    def json(self):
+                        return self._data
+                if FORECAST_URL in url:
+                    return MockResponse(wx_payload)
+                if GEOCODING_URL in url:
+                    return MockResponse(geo_payload)
+
+            mock_get.side_effect = side_effect
+            result = get_current_temperature("Budapest", country="HU")
+
+        assert result["city"] == "Budapest, Budapest, Hungary"
+        assert result["temperature"] == 26.5
+
+        call_args = mock_get.call_args_list[0]
+        assert call_args[1]["params"].get("country_code") == "HU"
+
+    def test_unrecognized_country_falls_through(self):
+        geo_payload = {
+            "results": [
+                _make_geo_result("Springfield", 39.78, -89.65, "Illinois", "United States"),
+                _make_geo_result("Springfield", 42.10, -72.58, "Massachusetts", "United States"),
+            ]
+        }
+
+        with patch("src.weather_tool.requests.get") as mock_get:
+            class MockResponse:
+                def raise_for_status(self):
+                    pass
+                def json(self):
+                    return geo_payload
+
+            mock_get.return_value = MockResponse()
+            result = get_current_temperature("Springfield", country="Unknownland")
+
+        assert result["error"] == "ambiguous_city"
+        assert "_note" in result
+        assert "Unrecognized" in result["_note"]
+
+
 class TestGeocodingFiltering:
 
     def test_prefix_match_filtered_out(self):

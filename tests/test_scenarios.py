@@ -8,7 +8,10 @@ from openai.types.chat.chat_completion_message_tool_call import Function
 from src.orchestrator import run_agent
 
 
-def _tool_msg(city: str, call_id: str = "call_1") -> ChatCompletionMessage:
+def _tool_msg(city: str, call_id: str = "call_1", country: str = "") -> ChatCompletionMessage:
+    args: dict[str, str] = {"city": city}
+    if country:
+        args["country"] = country
     return ChatCompletionMessage(
         content=f"I'll look up the temperature in {city}.",
         role="assistant",
@@ -17,7 +20,7 @@ def _tool_msg(city: str, call_id: str = "call_1") -> ChatCompletionMessage:
                 id=call_id,
                 function=Function(
                     name="get_current_temperature",
-                    arguments=json.dumps({"city": city}),
+                    arguments=json.dumps(args),
                 ),
                 type="function",
             )
@@ -41,6 +44,23 @@ def _multi_tool_msg(
                 type="function",
             )
             for city, call_id in calls
+        ],
+    )
+
+
+def _tool_msg_with_country(city: str, country: str, call_id: str = "call_1") -> ChatCompletionMessage:
+    return ChatCompletionMessage(
+        content=f"I'll look up the temperature in {city}.",
+        role="assistant",
+        tool_calls=[
+            ChatCompletionMessageToolCall(
+                id=call_id,
+                function=Function(
+                    name="get_current_temperature",
+                    arguments=json.dumps({"city": city, "country": country}),
+                ),
+                type="function",
+            )
         ],
     )
 
@@ -190,7 +210,7 @@ class TestMultipleCities:
             ),
         ])
 
-        def _weather_side_effect(city: str) -> dict:
+        def _weather_side_effect(city: str, **kwargs) -> dict:
             return {"Budapest": _BUDAPEST_OK, "Vienna": _VIENNA_OK}.get(city, {})
 
         with patch("src.orchestrator.get_current_temperature", side_effect=_weather_side_effect):
@@ -228,6 +248,30 @@ class TestMultipleCities:
                 if s["type"] == "tool_result"
             ]
             assert temperatures == [26.5, 22.3]
+        finally:
+            _clean_trace(trace_path)
+
+
+class TestCountryDisambiguation:
+
+    def test_country_passed_separately_resolves(self):
+        mock_llm = _MockLLM(side_effect=[
+            _tool_msg_with_country("Budapest", "Hungary"),
+            _final_msg("The current temperature in Budapest is 26.5\u00b0C."),
+        ])
+
+        with patch("src.orchestrator.get_current_temperature", return_value=_BUDAPEST_OK):
+            answer, trace_path = run_agent(
+                "What's the temperature in Budapest, Hungary?",
+                llm_client=mock_llm,
+            )
+
+        try:
+            assert "26.5" in answer
+            trace = _load_trace(trace_path)
+            tool_call = trace["steps"][1]
+            assert tool_call["arguments"]["city"] == "Budapest"
+            assert tool_call["arguments"]["country"] == "Hungary"
         finally:
             _clean_trace(trace_path)
 
