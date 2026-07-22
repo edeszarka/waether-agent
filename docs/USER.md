@@ -42,6 +42,8 @@ Copy `.env.example` to `.env` and fill in the values:
 cp .env.example .env
 ```
 
+On Windows (Command Prompt / PowerShell) use `copy .env.example .env` instead.
+
 You need three settings:
 
 | Variable | What it is |
@@ -84,7 +86,7 @@ python -m src.main "What's the temperature in Budapest?"
 
 | Question | What you'll get |
 |---|---|
-| "What's the temperature in Budapest?" | The current temperature for Budapest, e.g. "The temperature in Budapest is 26.5°C." |
+| "What's the temperature in Vienna?" | The current temperature for Vienna, e.g. "The temperature in Vienna is 22.3°C." |
 | "What's the forecast for next week?" | A polite refusal stating the agent only answers current-temperature questions. |
 | "What's the temperature in Springfield?" | A clarification question asking which Springfield you mean (multiple locations exist). |
 | "What's the temperature in Budapest and Vienna?" | Both temperatures reported, e.g. "Budapest: 26.5°C, Vienna: 22.3°C." |
