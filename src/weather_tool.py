@@ -11,8 +11,29 @@ MAX_PLAUSIBLE_TEMP = 60.0
 POPULATED_FEATURE_CODES = frozenset({
     "PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLC", "PPLCH",
     "PPLF", "PPLG", "PPLH", "PPLL", "PPLQ", "PPLR", "PPLS",
-    "PPLW", "PPLX", "STLMT",
+    "PPLW", "STLMT",
 })
+
+# GeoNames hierarchy: lower number = higher administrative order.
+_FEATURE_CODE_RANK: dict[str, int] = {
+    "PPLC": 0,
+    "PPLA": 1,
+    "PPLA2": 2,
+    "PPLA3": 3,
+    "PPLA4": 4,
+    "PPL": 5,
+    "PPLCH": 6,
+    "PPLF": 6,
+    "PPLG": 6,
+    "PPLH": 6,
+    "PPLL": 6,
+    "PPLQ": 6,
+    "PPLR": 6,
+    "PPLS": 6,
+    "PPLW": 6,
+    "STLMT": 7,
+    "PPLX": 8,
+}
 
 COUNTRY_CODES: dict[str, str] = {
     "hungary": "HU",
@@ -100,6 +121,23 @@ def _filter_geocoding_results(
     ]
 
 
+def _deduplicate_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse same-city entries recorded at multiple admin levels.
+
+    Key is (name, country_code, admin1) — so Springfield IL and Springfield MA
+    remain separate candidates. Within a group the highest-rank feature-code wins.
+    """
+    groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for r in results:
+        key = (r.get("name", "").lower(), r.get("country_code", ""), r.get("admin1", ""))
+        groups.setdefault(key, []).append(r)
+
+    return [
+        min(group, key=lambda r: _FEATURE_CODE_RANK.get(r.get("feature_code", ""), 99))
+        for group in groups.values()
+    ]
+
+
 def get_current_temperature(city: str, country: str | None = None) -> dict[str, Any]:
     """Get the current temperature for *city* via Open-Meteo.
 
@@ -134,7 +172,7 @@ def get_current_temperature(city: str, country: str | None = None) -> dict[str, 
             "name": city_clean, "count": 10, "language": "en", "format": "json",
         }
         if country_code:
-            params["country_code"] = country_code
+            params["countryCode"] = country_code
         geo_resp = requests.get(GEOCODING_URL, params=params, timeout=10)
         geo_resp.raise_for_status()
         geo_data = geo_resp.json()
@@ -149,6 +187,7 @@ def get_current_temperature(city: str, country: str | None = None) -> dict[str, 
         }, country_note)
 
     results = _filter_geocoding_results(raw_results, city_clean)
+    results = _deduplicate_results(results)
     if not results:
         return _with_note({
             "error": "city_not_found",
