@@ -9,4 +9,10 @@ description = "A minimal LLM-driven agent for answering current-temperature ques
 requires-python = ">=3.11"
 dependencies = [
     "openai>=1.0.0",
+    "requests>=2.28",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
 ]
