@@ -14,6 +14,66 @@ POPULATED_FEATURE_CODES = frozenset({
     "PPLW", "PPLX", "STLMT",
 })
 
+COUNTRY_CODES: dict[str, str] = {
+    "hungary": "HU",
+    "austria": "AT",
+    "united states": "US",
+    "usa": "US",
+    "united kingdom": "GB",
+    "uk": "GB",
+    "germany": "DE",
+    "france": "FR",
+    "italy": "IT",
+    "spain": "ES",
+    "netherlands": "NL",
+    "belgium": "BE",
+    "switzerland": "CH",
+    "canada": "CA",
+    "australia": "AU",
+    "japan": "JP",
+    "china": "CN",
+    "india": "IN",
+    "brazil": "BR",
+    "mexico": "MX",
+    "poland": "PL",
+    "czech republic": "CZ",
+    "czechia": "CZ",
+    "slovakia": "SK",
+    "romania": "RO",
+    "bulgaria": "BG",
+    "serbia": "RS",
+    "croatia": "HR",
+    "slovenia": "SI",
+    "ukraine": "UA",
+    "russia": "RU",
+    "sweden": "SE",
+    "norway": "NO",
+    "denmark": "DK",
+    "finland": "FI",
+    "greece": "GR",
+    "portugal": "PT",
+    "turkey": "TR",
+    "egypt": "EG",
+    "south africa": "ZA",
+    "argentina": "AR",
+    "colombia": "CO",
+    "new zealand": "NZ",
+    "south korea": "KR",
+}
+
+
+def _resolve_country_code(country: str | None) -> tuple[str | None, str | None]:
+    """Return (iso_alpha2, note). *note* is set when the value was unrecognized."""
+    if not country:
+        return None, None
+    cleaned = country.strip()
+    if len(cleaned) == 2 and cleaned.isalpha():
+        return cleaned.upper(), None
+    code = COUNTRY_CODES.get(cleaned.lower())
+    if code:
+        return code, None
+    return None, f"Unrecognized country '{cleaned}' — proceeding without country filter."
+
 
 def _is_populated_place(result: dict[str, Any]) -> bool:
     return result.get("feature_code", "") in POPULATED_FEATURE_CODES
@@ -21,6 +81,12 @@ def _is_populated_place(result: dict[str, Any]) -> bool:
 
 def _exact_name_match(searched: str, candidate_name: str) -> bool:
     return searched.lower() == candidate_name.lower()
+
+
+def _with_note(result: dict[str, Any], note: str | None) -> dict[str, Any]:
+    if note:
+        result["_note"] = note
+    return result
 
 
 def _filter_geocoding_results(
@@ -34,49 +100,60 @@ def _filter_geocoding_results(
     ]
 
 
-def get_current_temperature(city: str) -> dict[str, Any]:
+def get_current_temperature(city: str, country: str | None = None) -> dict[str, Any]:
     """Get the current temperature for *city* via Open-Meteo.
 
-    Contract
-    --------
-    On success returns:
-        {"city": <resolved display name>, "temperature": <float>, "unit": "celsius"}
+    Parameters
+    ----------
+    city : str
+        The city name (required).
+    country : str or None
+        Optional country name or ISO-3166-1 alpha-2 code to narrow the
+        geocoding search.
 
-    On expected error returns (does NOT raise):
+    Returns
+    -------
+    dict
+    On success:
+        {"city": ..., "temperature": ..., "unit": "celsius"}
+    On expected error (does NOT raise):
         {"error": "city_not_found",   "detail": <str>}
         {"error": "ambiguous_city",   "detail": [<candidate dict>, ...]}
         {"error": "upstream_error",   "detail": <str>}
     """
+    country_code, country_note = _resolve_country_code(country)
+
     if not city or not city.strip():
-        return {"error": "city_not_found", "detail": "City name is empty."}
+        return _with_note({"error": "city_not_found", "detail": "City name is empty."}, country_note)
 
     city_clean = city.strip()
 
     # --- Step 1: geocode ---------------------------------------------------
     try:
-        geo_resp = requests.get(
-            GEOCODING_URL,
-            params={"name": city_clean, "count": 10, "language": "en", "format": "json"},
-            timeout=10,
-        )
+        params: dict[str, Any] = {
+            "name": city_clean, "count": 10, "language": "en", "format": "json",
+        }
+        if country_code:
+            params["country_code"] = country_code
+        geo_resp = requests.get(GEOCODING_URL, params=params, timeout=10)
         geo_resp.raise_for_status()
         geo_data = geo_resp.json()
     except requests.RequestException as exc:
-        return {"error": "upstream_error", "detail": f"Geocoding API request failed: {exc}"}
+        return _with_note({"error": "upstream_error", "detail": f"Geocoding API request failed: {exc}"}, country_note)
 
     raw_results = geo_data.get("results", [])
     if not raw_results:
-        return {
+        return _with_note({
             "error": "city_not_found",
             "detail": f"No location found for '{city_clean}'.",
-        }
+        }, country_note)
 
     results = _filter_geocoding_results(raw_results, city_clean)
     if not results:
-        return {
+        return _with_note({
             "error": "city_not_found",
             "detail": f"No location found for '{city_clean}'.",
-        }
+        }, country_note)
 
     if len(results) > 1:
         candidates = [
@@ -87,18 +164,18 @@ def get_current_temperature(city: str) -> dict[str, Any]:
             }
             for r in results
         ]
-        return {
+        return _with_note({
             "error": "ambiguous_city",
             "detail": candidates,
-        }
+        }, country_note)
 
     location = results[0]
     lat = location["latitude"]
     lon = location["longitude"]
     resolved_name = location.get("name", city_clean)
     admin1 = location.get("admin1", "")
-    country = location.get("country", "")
-    parts = [p for p in (resolved_name, admin1, country) if p]
+    resolved_country = location.get("country", "")
+    parts = [p for p in (resolved_name, admin1, resolved_country) if p]
     display_name = ", ".join(parts)
 
     # --- Step 2: fetch current weather -------------------------------------
@@ -111,34 +188,34 @@ def get_current_temperature(city: str) -> dict[str, Any]:
         wx_resp.raise_for_status()
         wx_data = wx_resp.json()
     except requests.RequestException as exc:
-        return {"error": "upstream_error", "detail": f"Forecast API request failed: {exc}"}
+        return _with_note({"error": "upstream_error", "detail": f"Forecast API request failed: {exc}"}, country_note)
 
     current = wx_data.get("current_weather")
     if current is None:
-        return {
+        return _with_note({
             "error": "upstream_error",
             "detail": "Forecast response missing 'current_weather' field.",
-        }
+        }, country_note)
 
     temperature = current.get("temperature")
     if temperature is None:
-        return {
+        return _with_note({
             "error": "upstream_error",
             "detail": "Forecast response missing temperature in current_weather.",
-        }
+        }, country_note)
 
     temp_val = float(temperature)
     if not (MIN_PLAUSIBLE_TEMP <= temp_val <= MAX_PLAUSIBLE_TEMP):
-        return {
+        return _with_note({
             "error": "upstream_error",
             "detail": (
                 f"Temperature {temp_val}°C is outside plausible range "
                 f"({MIN_PLAUSIBLE_TEMP} to {MAX_PLAUSIBLE_TEMP}°C)."
             ),
-        }
+        }, country_note)
 
-    return {
+    return _with_note({
         "city": display_name,
         "temperature": temp_val,
         "unit": "celsius",
-    }
+    }, country_note)
