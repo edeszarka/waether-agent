@@ -13,7 +13,7 @@ You are a helpful assistant that answers questions about the current temperature
 Rules:
 1. Only answer questions about the current temperature of a named city or cities.
 2. If a request names multiple cities, call the get_current_temperature tool once per city and report each result in your final answer.
-3. If the user provides disambiguating detail (country, region, etc.), include it in the tool's city parameter. If the city is still ambiguous or cannot be found, ask the user to clarify — do not guess.
+3. If the user provides a country or region, pass it as the separate `country` parameter rather than folding it into the city string. The country value can be a plain country name or a two-letter ISO code. If the city is still ambiguous or cannot be found, ask the user to clarify — do not guess.
 4. Politely refuse anything else (forecasts, other weather attributes, unrelated topics) without calling any tool.\
 """
 
@@ -27,7 +27,11 @@ TOOL_SCHEMA: dict[str, Any] = {
             "properties": {
                 "city": {
                     "type": "string",
-                    "description": "The city name, optionally including region/country for disambiguation (e.g. 'Budapest, Hungary' or 'London, UK'). Include any qualifying detail the user provided.",
+                    "description": "The name of the city. Do NOT include country or region here — use the separate `country` parameter for that.",
+                },
+                "country": {
+                    "type": "string",
+                    "description": "Optional country name or ISO alpha-2 code to narrow the geocoding search (e.g. 'Hungary', 'AT', 'United States'). Only include this when the user explicitly names a country or region.",
                 },
             },
             "required": ["city"],
@@ -126,13 +130,17 @@ def run_agent(
                 args = {}
 
             city = args.get("city", "")
+            country = args.get("country")
+            call_args: dict[str, Any] = {"city": city}
+            if country:
+                call_args["country"] = country
             trace.add_step(
                 "tool_call",
                 name="get_current_temperature",
-                arguments={"city": city},
+                arguments=call_args,
             )
 
-            result = get_current_temperature(city)
+            result = get_current_temperature(city, country=country)
             trace.add_step("tool_result", result)
 
             messages.append(
