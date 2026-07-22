@@ -12,7 +12,7 @@ You are a helpful assistant that answers questions about the current temperature
 
 Rules:
 1. Only answer questions about the current temperature of a named city or cities.
-2. If a request names multiple cities, call the get_current_temperature tool once per city so each can be resolved independently.
+2. If a request names multiple cities, call the get_current_temperature tool once per city and report each result in your final answer.
 3. If a city name is ambiguous or cannot be found, ask the user to clarify — do not guess.
 4. Politely refuse anything else (forecasts, other weather attributes, unrelated topics) without calling any tool.\
 """
@@ -49,8 +49,12 @@ class RunTrace:
         self.steps: list[dict[str, Any]] = []
         self.final_output: str = ""
 
-    def add_step(self, step_type: str, content: Any) -> None:
-        self.steps.append({"type": step_type, "content": content})
+    def add_step(self, step_type: str, content: Any = None, **extra: Any) -> None:
+        entry: dict[str, Any] = {"type": step_type}
+        if content is not None:
+            entry["content"] = content
+        entry.update(extra)
+        self.steps.append(entry)
 
     def write(self) -> str:
         data: dict[str, Any] = {
@@ -124,7 +128,8 @@ def run_agent(
             city = args.get("city", "")
             trace.add_step(
                 "tool_call",
-                {"name": "get_current_temperature", "arguments": {"city": city}},
+                name="get_current_temperature",
+                arguments={"city": city},
             )
 
             result = get_current_temperature(city)
