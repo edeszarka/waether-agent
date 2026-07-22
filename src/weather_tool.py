@@ -5,6 +5,9 @@ import requests
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 
+MIN_PLAUSIBLE_TEMP = -90.0
+MAX_PLAUSIBLE_TEMP = 60.0
+
 
 def get_current_temperature(city: str) -> dict[str, Any]:
     """Get the current temperature for *city* via Open-Meteo.
@@ -92,8 +95,18 @@ def get_current_temperature(city: str) -> dict[str, Any]:
             "detail": "Forecast response missing temperature in current_weather.",
         }
 
+    temp_val = float(temperature)
+    if not (MIN_PLAUSIBLE_TEMP <= temp_val <= MAX_PLAUSIBLE_TEMP):
+        return {
+            "error": "upstream_error",
+            "detail": (
+                f"Temperature {temp_val}°C is outside plausible range "
+                f"({MIN_PLAUSIBLE_TEMP} to {MAX_PLAUSIBLE_TEMP}°C)."
+            ),
+        }
+
     return {
         "city": display_name,
-        "temperature": float(temperature),
+        "temperature": temp_val,
         "unit": "celsius",
     }

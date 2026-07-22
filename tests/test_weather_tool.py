@@ -127,6 +127,30 @@ class TestGetCurrentTemperature:
         assert result["error"] == "upstream_error"
         assert "503" in result["detail"]
 
+    def test_impossible_temperature_rejected(self):
+        geo_payload = {"results": [_make_geo_result("Vienna", 48.21, 16.37, "Vienna", "Austria")]}
+        wx_payload = _make_forecast(224.3)
+
+        with patch("src.weather_tool.requests.get") as mock_get:
+            def side_effect(url, **kwargs):
+                class MockResponse:
+                    def __init__(self, data):
+                        self._data = data
+                    def raise_for_status(self):
+                        pass
+                    def json(self):
+                        return self._data
+                if GEOCODING_URL in url:
+                    return MockResponse(geo_payload)
+                if FORECAST_URL in url:
+                    return MockResponse(wx_payload)
+
+            mock_get.side_effect = side_effect
+            result = get_current_temperature("Vienna")
+
+        assert result["error"] == "upstream_error"
+        assert "outside plausible range" in result["detail"]
+
     def test_forecast_missing_current_weather(self):
         geo_payload = {"results": [_make_geo_result("Budapest", 47.49, 19.04)]}
 
