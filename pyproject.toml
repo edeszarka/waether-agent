@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=64"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "simple-agent-telekom"
@@ -16,3 +16,6 @@ dependencies = [
 dev = [
     "pytest>=8",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]
