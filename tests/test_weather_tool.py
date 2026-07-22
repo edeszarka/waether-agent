@@ -9,8 +9,8 @@ GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 
 
-def _make_geo_result(name, lat, lon, admin1="", country=""):
-    return {"name": name, "latitude": lat, "longitude": lon, "admin1": admin1, "country": country}
+def _make_geo_result(name, lat, lon, admin1="", country="", feature_code="PPL"):
+    return {"name": name, "latitude": lat, "longitude": lon, "admin1": admin1, "country": country, "feature_code": feature_code}
 
 
 def _make_forecast(temperature):
@@ -168,3 +168,66 @@ class TestGetCurrentTemperature:
             result = get_current_temperature("Budapest")
 
         assert result["error"] == "upstream_error"
+
+
+class TestGeocodingFiltering:
+
+    def test_prefix_match_filtered_out(self):
+        geo_payload = {
+            "results": [
+                _make_geo_result("Szombathely", 47.23, 16.62, "Vas County", "Hungary"),
+                _make_geo_result("Szombathelyitany\u00e1k", 47.20, 16.60, "", "Hungary"),
+                _make_geo_result("Szombathelyi Rep\u00fcl\u0151t\u00e9r", 47.18, 16.63, "", "Hungary"),
+            ]
+        }
+        wx_payload = _make_forecast(24.1)
+
+        with patch("src.weather_tool.requests.get") as mock_get:
+            def side_effect(url, **kwargs):
+                class MockResponse:
+                    def __init__(self, data):
+                        self._data = data
+                    def raise_for_status(self):
+                        pass
+                    def json(self):
+                        return self._data
+                if GEOCODING_URL in url:
+                    return MockResponse(geo_payload)
+                if FORECAST_URL in url:
+                    return MockResponse(wx_payload)
+
+            mock_get.side_effect = side_effect
+            result = get_current_temperature("Szombathely")
+
+        assert result["city"] == "Szombathely, Vas County, Hungary"
+        assert result["temperature"] == 24.1
+        assert result["unit"] == "celsius"
+
+    def test_airport_excluded_from_candidates(self):
+        geo_payload = {
+            "results": [
+                _make_geo_result("Szombathely", 47.23, 16.62, "Vas County", "Hungary", feature_code="PPL"),
+                _make_geo_result("Szombathelyi Rep\u00fcl\u0151t\u00e9r", 47.18, 16.63, "", "Hungary", feature_code="AIRP"),
+            ]
+        }
+        wx_payload = _make_forecast(24.1)
+
+        with patch("src.weather_tool.requests.get") as mock_get:
+            def side_effect(url, **kwargs):
+                class MockResponse:
+                    def __init__(self, data):
+                        self._data = data
+                    def raise_for_status(self):
+                        pass
+                    def json(self):
+                        return self._data
+                if GEOCODING_URL in url:
+                    return MockResponse(geo_payload)
+                if FORECAST_URL in url:
+                    return MockResponse(wx_payload)
+
+            mock_get.side_effect = side_effect
+            result = get_current_temperature("Szombathely")
+
+        assert result["city"] == "Szombathely, Vas County, Hungary"
+        assert result["temperature"] == 24.1

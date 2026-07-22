@@ -8,6 +8,31 @@ FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 MIN_PLAUSIBLE_TEMP = -90.0
 MAX_PLAUSIBLE_TEMP = 60.0
 
+POPULATED_FEATURE_CODES = frozenset({
+    "PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLC", "PPLCH",
+    "PPLF", "PPLG", "PPLH", "PPLL", "PPLQ", "PPLR", "PPLS",
+    "PPLW", "PPLX", "STLMT",
+})
+
+
+def _is_populated_place(result: dict[str, Any]) -> bool:
+    return result.get("feature_code", "") in POPULATED_FEATURE_CODES
+
+
+def _exact_name_match(searched: str, candidate_name: str) -> bool:
+    return searched.lower() == candidate_name.lower()
+
+
+def _filter_geocoding_results(
+    raw_results: list[dict[str, Any]],
+    searched_city: str,
+) -> list[dict[str, Any]]:
+    return [
+        r for r in raw_results
+        if _exact_name_match(searched_city, r.get("name", ""))
+        and _is_populated_place(r)
+    ]
+
 
 def get_current_temperature(city: str) -> dict[str, Any]:
     """Get the current temperature for *city* via Open-Meteo.
@@ -39,7 +64,14 @@ def get_current_temperature(city: str) -> dict[str, Any]:
     except requests.RequestException as exc:
         return {"error": "upstream_error", "detail": f"Geocoding API request failed: {exc}"}
 
-    results = geo_data.get("results", [])
+    raw_results = geo_data.get("results", [])
+    if not raw_results:
+        return {
+            "error": "city_not_found",
+            "detail": f"No location found for '{city_clean}'.",
+        }
+
+    results = _filter_geocoding_results(raw_results, city_clean)
     if not results:
         return {
             "error": "city_not_found",
