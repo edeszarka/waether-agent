@@ -15,11 +15,11 @@ User question
      v
 [ LLM (OpenAI-compatible chat + tool calling) ]
      |
-     |  tool_call: get_current_temperature(city)
-     v
+      |  tool_call: get_current_temperature(city, country?)
+      v
 [ Weather tool ]
-     |  1. geocode(city) -> lat/lon      (Open-Meteo Geocoding API)
-     |  2. forecast(lat, lon)            (Open-Meteo Forecast API, current_weather=true)
+      |  1. geocode(city, country?) -> lat/lon   (Open-Meteo Geocoding API)
+      |  2. forecast(lat, lon)                   (Open-Meteo Forecast API, current_weather=true)
      v
 [ Tool result returned to LLM ]
      |
@@ -51,8 +51,8 @@ User question
 
 ### 2.3 Weather tool
 
-- One Python function, `get_current_temperature(city: str) -> dict`.
-- Step 1: resolve `city` to coordinates via Open-Meteo's Geocoding API.
+- One Python function, `get_current_temperature(city: str, country: str | None = None) -> dict`.
+- Step 1: resolve `city` to coordinates via Open-Meteo's Geocoding API. When `country` is provided, it is passed as Open-Meteo's `countryCode` parameter to narrow geocoding results to a single country.
 - Step 2: call Open-Meteo's Forecast API (`current_weather=true`) with those coordinates.
 - Returns a small structured result: `{ "city": ..., "temperature": ..., "unit": "celsius" }`, or a typed error (`city_not_found`, `ambiguous_city`, `upstream_error`).
 - No MCP server, no separate protocol layer — this is a single direct HTTP call wrapped in a plain function, which is all the scope calls for.
