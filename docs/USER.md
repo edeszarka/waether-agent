@@ -23,6 +23,10 @@ happen with well-known names — "Budapest" returns matches in Hungary,
 Georgia (USA), and Missouri (USA), so the agent will ask which one you
 mean.
 
+**Tip:** including a country name in your question (e.g. "Budapest,
+Hungary") helps the agent resolve ambiguous names directly instead of
+asking for clarification.
+
 If a city name cannot be found at all, the agent will tell you and ask
 you to try a different name.
 
@@ -89,7 +93,8 @@ python -m src.main "What's the temperature in Budapest?"
 | "What's the temperature in Vienna?" | The current temperature for Vienna, e.g. "The temperature in Vienna is 22.3°C." |
 | "What's the forecast for next week?" | A polite refusal stating the agent only answers current-temperature questions. |
 | "What's the temperature in Springfield?" | A clarification question asking which Springfield you mean (multiple locations exist). |
-| "What's the temperature in Budapest and Vienna?" | Both temperatures reported, e.g. "Budapest: 26.5°C, Vienna: 22.3°C." |
+| "What's the temperature in Budapest and Vienna?" | Without country names both cities are ambiguous → the agent asks for clarification (try "Budapest, Hungary and Vienna, Austria" instead). |
+| "What's the temperature in Budapest, Hungary and Vienna, Austria?" | Both temperatures reported, e.g. "Budapest, Hungary: 27.4°C, Vienna, Austria: 25.3°C." |
 | "What's the temperature in Asdfghjkl?" | A message that the city was not found. |
 
 ## Run traces
