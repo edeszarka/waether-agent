@@ -97,6 +97,7 @@ At least three scenario-based tests, each specifying input, expected tool call(s
 2. **Out-of-scope query** — "What's the forecast for next week in Budapest?" → no tool call (or a refusal after evaluating scope) → polite refusal stating the agent only reports current temperature.
 3. **Ambiguous city** — a city name matching multiple locations → no premature tool call → a clarification question asking which location the user means.
 4. **Multiple cities in one request** — "What's the temperature in Budapest and Vienna?" → two tool calls (one per city) within the same run → a final answer reporting both temperatures.
+5. **Country provided** — "What's the temperature in Budapest, Hungary?" → one tool call with `city="Budapest"` and `country="Hungary"` → temperature reported directly, no clarification needed.
 
 ## 5. Documentation
 
@@ -118,8 +119,11 @@ At least three scenario-based tests, each specifying input, expected tool call(s
 │   ├── USER.md
 │   └── DEVELOPER.md
 ├── tests/
-│   └── test_scenarios.py
-└── traces/            # run traces written here
+│   ├── test_scenarios.py
+│   └── test_weather_tool.py
+├── scripts/
+│   └── debug_geocode.py    # dev diagnostic, not part of the shipped agent
+└── traces/                 # run traces written here
 ```
 
 ## 7. Explicit Non-Goals
