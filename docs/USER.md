@@ -90,7 +90,7 @@ python -m src.main "What's the temperature in Budapest?"
 
 | Question | What you'll get |
 |---|---|
-| "What's the temperature in Vienna?" | The current temperature for Vienna, e.g. "The temperature in Vienna is 22.3°C." |
+| "What's the temperature in Reykjavik?" | The current temperature for Reykjavik, e.g. "The current temperature in Reykjavik, Iceland is 11.5°C." |
 | "What's the forecast for next week?" | A polite refusal stating the agent only answers current-temperature questions. |
 | "What's the temperature in Springfield?" | A clarification question asking which Springfield you mean (multiple locations exist). |
 | "What's the temperature in Budapest and Vienna?" | Without country names both cities are ambiguous → the agent asks for clarification (try "Budapest, Hungary and Vienna, Austria" instead). |
