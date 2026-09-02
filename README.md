@@ -1,4 +1,4 @@
-# simple-agent-telekom
+# simple-weather-agent
 
 A minimal LLM-driven agent that answers current-temperature questions
 for named cities using real-time weather data from Open-Meteo.
